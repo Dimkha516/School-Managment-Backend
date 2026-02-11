@@ -1,0 +1,563 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  // provider = "prisma-client"
+  // output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+
+// ============================================================
+// MODELS
+// ============================================================
+
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique @db.VarChar(255)
+  passwordHash  String    @map("password_hash") @db.VarChar(255)
+  role          UserRole
+  isActive      Boolean   @default(true) @map("is_active")
+  lastLogin     DateTime? @map("last_login") @db.Timestamp(0)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relations
+  admin                Admin?
+  student              Student?
+  teacher              Teacher?
+  notifications        Notification[]
+  notificationReads    NotificationRead[]
+
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+  @@map("users")
+}
+
+// TABLE: programs / FILIERES
+model Program {
+  id          Int           @id @default(autoincrement())
+  name        String        @db.VarChar(200)
+  code        String        @unique @db.VarChar(20)
+  description String?       @db.Text
+  duration    String?       @db.VarChar(50)
+  level       String?       @db.VarChar(50)
+  status      ProgramStatus @default(active)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relations
+  students      Student[]
+  courses       Course[]
+  schedules     Schedule[]
+  assessments   Assessment[]
+  reportCards   ReportCard[]
+  notifications Notification[]
+
+  @@index([code])
+  @@index([status])
+  @@index([level])
+  @@map("programs")
+}
+
+model Student {
+  id                 Int           @id @default(autoincrement())
+  userId             Int?          @unique @map("user_id")
+  registrationNumber String        @unique @map("registration_number") @db.VarChar(50)
+  lastName           String        @map("last_name") @db.VarChar(100)
+  firstName          String        @map("first_name") @db.VarChar(100)
+  email              String        @unique @db.VarChar(255)
+  phone              String?       @db.VarChar(20)
+  birthDate          DateTime?     @map("birth_date") @db.Date
+  gender             Gender
+  address            String?       @db.Text
+  photoUrl           String?       @map("photo_url") @db.VarChar(500)
+  programId          Int?          @map("program_id")
+  level              String?       @db.VarChar(50)
+  status             StudentStatus @default(active)
+  enrollmentDate     DateTime      @map("enrollment_date") @db.Date
+  academicYear       String?       @map("academic_year") @db.VarChar(20)
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relations
+  user        User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  program     Program?     @relation(fields: [programId], references: [id], onDelete: SetNull)
+  attendance  Attendance[]
+  grades      Grade[]
+  reportCards ReportCard[]
+  payments    Payment[]
+
+  @@index([registrationNumber])
+  @@index([programId])
+  @@index([status])
+  @@index([lastName, firstName])
+  @@index([programId, status])
+  @@map("students")
+}
+
+model Teacher {
+  id                 Int           @id @default(autoincrement())
+  userId             Int?          @unique @map("user_id")
+  registrationNumber String        @unique @map("registration_number") @db.VarChar(50)
+  lastName           String        @map("last_name") @db.VarChar(100)
+  firstName          String        @map("first_name") @db.VarChar(100)
+  title              String?       @db.VarChar(50)
+  email              String        @unique @db.VarChar(255)
+  phone              String?       @db.VarChar(20)
+  photoUrl           String?       @map("photo_url") @db.VarChar(500)
+  specialty          String?       @db.VarChar(200)
+  degree             String?       @db.VarChar(200)
+  hireDate           DateTime      @map("hire_date") @db.Date
+  status             TeacherStatus @default(contract)
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relations
+  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courses   Course[]
+  schedules Schedule[]
+
+  @@index([registrationNumber])
+  @@index([status])
+  @@index([lastName, firstName])
+  @@map("teachers")
+}
+
+model Admin {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @unique @map("user_id")
+  lastName    String   @map("last_name") @db.VarChar(100)
+  firstName   String   @map("first_name") @db.VarChar(100)
+  phone       String?  @db.VarChar(20)
+  permissions Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("admins")
+}
+
+
+model Course {
+  id          Int          @id @default(autoincrement())
+  name        String       @db.VarChar(200)
+  code        String       @unique @db.VarChar(20)
+  description String?      @db.Text
+  programId   Int          @map("program_id")
+  teacherId   Int?         @map("teacher_id")
+  credits     Int          @default(0)
+  hours       Int          @default(0)
+  semester    Int?
+  status      CourseStatus @default(planned)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relations
+  program     Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  teacher     Teacher?     @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  schedules   Schedule[]
+  attendance  Attendance[]
+  assessments Assessment[]
+  grades      Grade[]
+
+  @@index([code])
+  @@index([programId])
+  @@index([teacherId])
+  @@index([semester])
+  @@index([status])
+  @@map("courses")
+}
+
+model Room {
+  id         Int        @id @default(autoincrement())
+  roomNumber String     @unique @map("room_number") @db.VarChar(20)
+  name       String?    @db.VarChar(200)
+  type       RoomType   @default(Classroom)
+  capacity   Int        @default(0)
+  equipment  Json?
+  building   String?    @db.VarChar(50)
+  floor      Int?
+  status     RoomStatus @default(available)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt  DateTime   @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relations
+  schedules   Schedule[]
+  assessments Assessment[]
+
+  @@index([roomNumber])
+  @@index([status])
+  @@index([type])
+  @@map("rooms")
+}
+
+// Emploi du temps 
+model Schedule {
+  id           Int         @id @default(autoincrement())
+  courseId     Int         @map("course_id")
+  teacherId    Int         @map("teacher_id")
+  roomId       Int         @map("room_id")
+  programId    Int         @map("program_id")
+  dayOfWeek    DayOfWeek   @map("day_of_week")
+  startTime    DateTime    @map("start_time") @db.Time(0)
+  endTime      DateTime    @map("end_time") @db.Time(0)
+  type         SessionType @default(lecture)
+  semester     Int
+  academicYear String      @map("academic_year") @db.VarChar(20)
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relations
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  room    Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, dayOfWeek, startTime, academicYear], name: "unique_room_schedule")
+  @@index([courseId])
+  @@index([dayOfWeek])
+  @@index([programId])
+  @@index([academicYear])
+  @@index([semester])
+  @@map("schedules")
+}
+
+// Présences
+model Attendance {
+  id          Int              @id @default(autoincrement())
+  studentId   Int              @map("student_id")
+  courseId    Int              @map("course_id")
+  date        DateTime         @db.Date
+  status      AttendanceStatus @default(present)
+  note        String?          @db.Text
+  arrivalTime DateTime?        @map("arrival_time") @db.Time(0)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId, date], name: "unique_attendance")
+  @@index([studentId])
+  @@index([courseId])
+  @@index([date])
+  @@index([status])
+  @@index([date, status])
+  @@map("attendance")
+}
+
+// Evaluations
+model Assessment {
+  id             Int              @id @default(autoincrement())
+  title          String           @db.VarChar(200)
+  courseId       Int              @map("course_id")
+  programId      Int              @map("program_id")
+  roomId         Int?             @map("room_id")
+  type           AssessmentType
+  date           DateTime         @db.Date
+  startTime      DateTime         @map("start_time") @db.Time(0)
+  endTime        DateTime         @map("end_time") @db.Time(0)
+  duration       Int?
+  totalPoints    Decimal          @default(20.00) @map("total_points") @db.Decimal(5, 2)
+  coefficient    Int              @default(1)
+  description    String?          @db.Text
+  status         AssessmentStatus @default(planned)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relations
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  room    Room?   @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  grades  Grade[]
+
+  @@index([courseId])
+  @@index([date])
+  @@index([type])
+  @@index([status])
+  @@index([programId])
+  @@map("assessments")
+}
+
+
+// Notes
+model Grade {
+  id             Int      @id @default(autoincrement())
+  studentId      Int      @map("student_id")
+  assessmentId   Int      @map("assessment_id")
+  courseId       Int      @map("course_id")
+  grade          Decimal? @db.Decimal(5, 2)
+  maxPoints      Decimal  @default(20.00) @map("max_points") @db.Decimal(5, 2)
+  coefficient    Int      @default(1)
+  assessmentDate DateTime @map("assessment_date") @db.Date
+  note           String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relations
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  course     Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, assessmentId], name: "unique_grade")
+  @@index([studentId])
+  @@index([assessmentId])
+  @@index([courseId])
+  @@index([studentId, courseId])
+  @@map("grades")
+}
+
+// Bulletin de notes
+model ReportCard {
+  id              Int              @id @default(autoincrement())
+  studentId       Int              @map("student_id")
+  programId       Int              @map("program_id")
+  level           String           @db.VarChar(50)
+  semester        Int
+  academicYear    String           @map("academic_year") @db.VarChar(20)
+  overallAverage  Decimal?         @map("overall_average") @db.Decimal(5, 2)
+  totalCredits    Int              @default(0) @map("total_credits")
+  earnedCredits   Int              @default(0) @map("earned_credits")
+  honors          String?          @db.VarChar(50)
+  rank            Int?
+  status          ReportCardStatus @default(passed)
+  issueDate       DateTime?        @map("issue_date") @db.Date
+  gradesJson      Json?            @map("grades_json")
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, semester, academicYear], name: "unique_report_card")
+  @@index([studentId])
+  @@index([semester])
+  @@index([academicYear])
+  @@index([status])
+  @@map("report_cards")
+}
+
+model Payment {
+  id              Int           @id @default(autoincrement())
+  studentId       Int           @map("student_id")
+  amount          Decimal       @db.Decimal(10, 2)
+  paymentType     String        @map("payment_type") @db.VarChar(100)
+  paymentMethod   PaymentMethod @map("payment_method")
+  reference       String        @unique @db.VarChar(100)
+  installment     String?       @db.VarChar(50)
+  academicYear    String        @map("academic_year") @db.VarChar(20)
+  transactionDate DateTime      @map("transaction_date") @db.Date
+  dueDate         DateTime?     @map("due_date") @db.Date
+  status          PaymentStatus @default(pending)
+  note            String?       @db.Text
+  receiptUrl      String?       @map("receipt_url") @db.VarChar(500)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([reference])
+  @@index([status])
+  @@index([transactionDate])
+  @@index([academicYear])
+  @@index([studentId, academicYear])
+  @@map("payments")
+}
+
+model Notification {
+  id             Int                  @id @default(autoincrement())
+  title          String               @db.VarChar(200)
+  message        String               @db.Text
+  type           NotificationType     @default(info)
+  priority       NotificationPriority @default(medium)
+  recipients     Json
+  programId      Int?                 @map("program_id")
+  level          String?              @db.VarChar(50)
+  createdDate    DateTime             @default(now()) @map("created_date") @db.Timestamp(0)
+  expirationDate DateTime?            @map("expiration_date") @db.Timestamp(0)
+  status         NotificationStatus   @default(draft)
+  authorId       Int?                 @map("author_id")
+  readCount      Int                  @default(0) @map("read_count")
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relations
+  program Program?           @relation(fields: [programId], references: [id], onDelete: SetNull)
+  author  User?              @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  reads   NotificationRead[]
+
+  @@index([type])
+  @@index([status])
+  @@index([createdDate])
+  @@index([programId])
+  @@index([priority])
+  @@map("notifications")
+}
+
+model NotificationRead {
+  id             Int          @id @default(autoincrement())
+  notificationId Int          @map("notification_id")
+  userId         Int          @map("user_id")
+  readDate       DateTime     @default(now()) @map("read_date") @db.Timestamp(0)
+
+  // Relations
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId], name: "unique_read")
+  @@index([notificationId])
+  @@index([userId])
+  @@map("notification_reads")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  admin
+  teacher
+  student
+}
+
+enum ProgramStatus {
+  active
+  inactive
+  archived
+}
+
+enum Gender {
+  M
+  F
+}
+
+enum StudentStatus {
+  active
+  inactive
+  suspended
+  graduated
+}
+
+enum TeacherStatus {
+  permanent
+  contract
+  temporary
+}
+
+enum CourseStatus {
+  planned
+  in_progress
+  completed
+  cancelled
+}
+
+enum RoomType {
+  Classroom
+  Laboratory
+  Auditorium
+  MeetingRoom @map("Meeting room")
+}
+
+enum RoomStatus {
+  available
+  occupied
+  maintenance
+  out_of_service
+}
+
+enum DayOfWeek {
+  Monday
+  Tuesday
+  Wednesday
+  Thursday
+  Friday
+  Saturday
+}
+
+enum SessionType {
+  lecture
+  practical
+  tutorial
+  exam
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  excused
+}
+
+enum AssessmentType {
+  exam
+  assignment
+  practical
+  continuous_assessment
+  oral
+}
+
+enum AssessmentStatus {
+  planned
+  in_progress
+  completed
+  cancelled
+}
+
+enum ReportCardStatus {
+  passed
+  failed
+  repeat
+  expelled
+}
+
+enum PaymentMethod {
+  cash
+  mobile_money
+  transfer
+  check
+  card
+}
+
+enum PaymentStatus {
+  pending
+  approved
+  rejected
+  refunded
+}
+
+enum NotificationType {
+  info
+  exam
+  course
+  payment
+  meeting
+  urgent
+}
+
+enum NotificationPriority {
+  low
+  medium
+  high
+}
+
+enum NotificationStatus {
+  draft
+  sent
+  archived
+}
+

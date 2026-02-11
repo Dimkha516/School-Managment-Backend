@@ -32,13 +32,14 @@ const limiter = rateLimit({
 app.use(`${baseUrl}`, limiter);
 
 // ROUTES CALLING:
-const authRouter = require("./routes/auth.routes");
+const authRouter = require("./src/routes/auth.routes");
+const usersRouter = require("./src/routes/users.routes");
 
 // ROUTES USE:
 app.use(`${baseUrl}/auth`, authRouter);
-// app.use("/api/v1/auth", authRouter);
+app.use(`${baseUrl}/users`, usersRouter);
 
 // CLOSING LINE: RUN SERVER
 app.listen(PORT, () => {
   console.log(`server running on port ${PORT}`);
-}); 
+});
