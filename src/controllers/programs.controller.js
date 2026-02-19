@@ -1,2 +1,2 @@
 const crudController = require("./crud.controller");
-module.exports = crudController("user");
+module.exports = crudController("program");

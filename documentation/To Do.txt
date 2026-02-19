@@ -1,0 +1,2 @@
+Add student(s) to classe
+Affecte teacher to course
